@@ -1,0 +1,62 @@
+#!/bin/bash
+
+usage() {
+	echo "$0 [-h] [<gtk save file>|-]"
+	echo
+	echo "This script parses the gtkwave save file and writes to the standard"
+	echo "output a tcl file that can be used to add the signals to gtkwave in"
+	echo "the future. If no input file is given the script read the standard"
+	echo "input"
+	echo
+	echo "Options:"
+	echo "-h shows this message"
+	echo
+}
+
+case $# in
+	0) infile="-"
+		;;
+	1) if [ "$1" == "-h" ]; then
+			usage
+			exit 0
+		fi
+		infile="$1"
+		;;
+	*) usage
+		;;
+esac
+
+if [ "$infile" != "-" ]; then
+	if [ ! -f "$infile" ]; then
+		echo
+		echo "error: $infile not a regular file"
+		echo
+		usage
+		exit 1
+	fi
+	exec < "$infile"
+fi
+
+
+(grep -ve "^\[\|^@\|^\*" | \
+	gawk '/^[^+]/ {
+	        if (match($0,/([^+].*)\[[0-9]+:[0-9]+\]/,a)) {
+				print "gtkwave::addSignalsFromList", a[1]
+			} else {
+	        	print "gtkwave::addSignalsFromList", $0
+			}
+		  }
+	      /^\+/ {
+		    if (match($0,/^\+\{(.*)\} \(([0-9]+)\)(.+)\[([0-9]+):([0-9]+)\]/,a)) {
+				print "gtkwave::addSignalsFromList", a[3]"\\["a[4]-a[2]"\\]";
+				print "gtkwave::highlightSignalsFromList", a[3]"\\["a[4]-a[2]"\\]";
+				print "gtkwave::/Edit/Alias_Highlighted_Trace", a[1]
+			} else if (match($0,/^\+\{(.*)\} (.+)\[([0-9]+):([0-9]+)\]/,a)) {
+				print "gtkwave::addSignalsFromList", a[2];
+				print "gtkwave::highlightSignalsFromList", a[2];
+				print "gtkwave::/Edit/Alias_Highlighted_Trace", a[1]
+			}
+		}
+	')<&0
+
+

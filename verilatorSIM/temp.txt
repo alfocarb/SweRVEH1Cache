@@ -1,0 +1,1 @@
+verilator -f swervolf_0.7.vc --trace -Wno-fatal
